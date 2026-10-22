@@ -1,0 +1,72 @@
+[
+  {
+    "domain": "Machine Learning",
+    "source": "Integrated a fine-tuned ResNet50 model through REST APIs to classify images as Real or AI-Generated.",
+    "evidence": "",
+    "improved": "Integrated a fine-tuned ResNet50 model through REST APIs to classify images as Real or AI-Generated.",
+    "explanation": "Clarified technical phrasing and strengthened action verb.",
+    "warnings": [],
+    "ml_quality": null,
+    "ml_confidence": null
+  },
+  {
+    "domain": "Software Engineering",
+    "source": "Developed authentication microservice in Node.js and JWT with role-based access control.",
+    "evidence": "",
+    "improved": "Developed a Node.js authentication microservice utilizing JWT with role-based access control.",
+    "explanation": "Clarified technical phrasing and strengthened action verb.",
+    "warnings": [],
+    "ml_quality": null,
+    "ml_confidence": null
+  },
+  {
+    "domain": "Data Analysis",
+    "source": "Analyzed customer churn trends using SQL queries and generated monthly Tableau dashboards.",
+    "evidence": "",
+    "improved": "Analyzed customer churn trends using SQL queries and generated monthly Tableau dashboards.",
+    "explanation": "Clarified technical phrasing and strengthened action verb.",
+    "warnings": [],
+    "ml_quality": null,
+    "ml_confidence": null
+  },
+  {
+    "domain": "Academic Projects",
+    "source": "Implemented Dijkstra's and A* pathfinding algorithms in C++ for graph traversal benchmark.",
+    "evidence": "",
+    "improved": "Implemented Dijkstra's and A\">*</bullseye> pathfinding algorithms in C++ for graph traversal benchmarking.",
+    "explanation": "Clarified technical phrasing and strengthened action verb without adding unsubstantiated claims.",
+    "warnings": [],
+    "ml_quality": null,
+    "ml_confidence": null
+  },
+  {
+    "domain": "Internships",
+    "source": "Assisted senior engineers with writing unit tests in PyTest and resolving Jira bug tickets.",
+    "evidence": "",
+    "improved": "Assisted senior engineers with writing unit tests in PyTest and resolved Jira bug tickets.",
+    "explanation": "Clarified technical phrasing and strengthened action verb.",
+    "warnings": [],
+    "ml_quality": null,
+    "ml_confidence": null
+  },
+  {
+    "domain": "QA and Testing",
+    "source": "Created end-to-end Cypress test suites covering login and checkout payment workflows.",
+    "evidence": "",
+    "improved": "Developed comprehensive Cypress test suites for login and checkout payment workflows, ensuring thorough coverage of critical business processes.",
+    "explanation": "Clarified technical phrasing and strengthened action verb to enhance bullet clarity and precision.",
+    "warnings": [],
+    "ml_quality": null,
+    "ml_confidence": null
+  },
+  {
+    "domain": "Cloud & Backend",
+    "source": "Configured Docker containers and deployed microservices on AWS ECS using Terraform.",
+    "evidence": "Processed 2 million records daily using Celery and Redis.",
+    "improved": "Configured Docker containers and deployed microservices on AWS ECS using Terraform.",
+    "explanation": "Clarified technical phrasing and strengthened action verb.",
+    "warnings": [],
+    "ml_quality": null,
+    "ml_confidence": null
+  }
+]

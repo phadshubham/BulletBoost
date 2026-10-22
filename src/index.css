@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ivory: #F7F6F2;
+  --color-surface: #FFFFFF;
+  --color-charcoal: #202923;
+  --color-forest: #496B58;
+  --color-forest-dark: #3A5647;
+  --color-forest-light: #5A7D69;
+  --color-sage: #DCE7DE;
+  --color-sage-light: #EBF0EC;
+  --color-border: #E2E2DE;
+  --color-border-dark: #CBCBC7;
+  --color-muted: #6B7570;
+  --color-muted-light: #9BA39E;
+  --color-error: #C14B4B;
+  --color-error-bg: #FDF2F2;
+  --color-success: #3D7A52;
+  --color-success-bg: #F0F8F2;
+  --color-warning: #B58B2D;
+  --color-warning-bg: #FDF8EE;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-ivory);
+  color: var(--color-charcoal);
+  line-height: 1.6;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-dark);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-light);
+}
+
+/* Focus ring utility */
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-sage);
+  color: var(--color-charcoal);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 2000px; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out forwards;
+  overflow: hidden;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-sage-light) 25%,
+    var(--color-sage) 50%,
+    var(--color-sage-light) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}

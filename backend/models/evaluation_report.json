@@ -1,0 +1,79 @@
+{
+  "model_name": "bullet_quality_classifier",
+  "model_version": "1.0.0",
+  "model_architecture": "TF-IDF (unigrams & bigrams) + LogisticRegression (L2, balanced)",
+  "scikit_learn_version": "1.9.0",
+  "evaluation_timestamp": "2026-10-19T10:03:43.072121+00:00",
+  "random_seed": 42,
+  "dataset_metadata": {
+    "total_samples": 183,
+    "train_samples": 146,
+    "test_samples": 37,
+    "test_split_ratio": 0.2,
+    "overall_distribution": {
+      "weak": 62,
+      "adequate": 61,
+      "strong": 60
+    },
+    "train_distribution": {
+      "adequate": 49,
+      "weak": 49,
+      "strong": 48
+    },
+    "test_distribution": {
+      "weak": 13,
+      "adequate": 12,
+      "strong": 12
+    },
+    "provenance": "Curated domain-specific dataset with synthetic-grounded examples across engineering, data science, QA, and project management. Evaluated against a 3-tier rubric.",
+    "limitations": "This experimental classifier estimates quality against a specific written rubric. It is not an ATS hiring score or factual verification tool. Performance may vary on out-of-domain resumes."
+  },
+  "metrics": {
+    "accuracy": 0.7568,
+    "macro_precision": 0.7681,
+    "macro_recall": 0.7607,
+    "macro_f1": 0.7521,
+    "class_labels": [
+      "weak",
+      "adequate",
+      "strong"
+    ],
+    "per_class": {
+      "weak": {
+        "precision": 0.8889,
+        "recall": 0.6154,
+        "f1_score": 0.7273,
+        "support": 13
+      },
+      "adequate": {
+        "precision": 0.6154,
+        "recall": 0.6667,
+        "f1_score": 0.64,
+        "support": 12
+      },
+      "strong": {
+        "precision": 0.8,
+        "recall": 1.0,
+        "f1_score": 0.8889,
+        "support": 12
+      }
+    },
+    "confusion_matrix": [
+      [
+        8,
+        5,
+        0
+      ],
+      [
+        1,
+        8,
+        3
+      ],
+      [
+        0,
+        0,
+        12
+      ]
+    ]
+  }
+}
