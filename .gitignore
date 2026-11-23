@@ -37,6 +37,11 @@ htmlcov/
 .system_generated/
 scratch/
 
+# Roles & Unwanted / Auxiliary Files
+roles/
+unwanted_files/
+unwanted files/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
