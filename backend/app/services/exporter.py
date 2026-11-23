@@ -40,6 +40,8 @@ def generate_resume_docx(
     Generate a professional Word (.docx) resume in memory.
     Preserves original section ordering and non-modified bullets,
     substituting only explicitly accepted bullet improvements.
+    The document body begins directly with the resume sections
+    without injecting artificial headings or filenames.
     """
     doc = Document()
 
@@ -49,24 +51,6 @@ def generate_resume_docx(
         s.bottom_margin = Inches(0.75)
         s.left_margin = Inches(0.75)
         s.right_margin = Inches(0.75)
-
-    # Document Title / Name Header
-    title_text = document_title or "RESUME"
-    # If filename like "Jane_Doe_Resume.docx" was passed, clean to "Jane Doe" or "Resume"
-    if title_text.lower().endswith(".docx"):
-        title_text = title_text[:-5]
-    clean_title = title_text.replace("_", " ").replace("-", " ").strip()
-    if clean_title.lower() in ("resume", "pasted resume", "uploaded resume", "enhanced resume"):
-        clean_title = "ENHANCED RESUME"
-
-    title_p = doc.add_paragraph()
-    title_p.paragraph_format.space_before = Pt(0)
-    title_p.paragraph_format.space_after = Pt(10)
-    title_run = title_p.add_run(clean_title.upper())
-    title_run.font.name = "Calibri"
-    title_run.font.size = Pt(18)
-    title_run.font.bold = True
-    title_run.font.color.rgb = RGBColor(0x1F, 0x29, 0x37)
 
     if not sections:
         empty_p = doc.add_paragraph("No resume sections were provided.")

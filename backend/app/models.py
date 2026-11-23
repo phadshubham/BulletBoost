@@ -254,7 +254,7 @@ class EvaluationMetricsResponse(BaseModel):
 
 class AcceptedBulletExportItem(BaseModel):
     """An accepted bullet revision to substitute into the exported document."""
-    bullet_id: str = Field(..., description="Original bullet identifier to replace")
+    bullet_id: Optional[str] = Field(default="", description="Original bullet identifier to replace")
     text: str = Field(..., description="Approved enhanced text to substitute")
 
 
@@ -268,3 +268,173 @@ class ExportDocxRequest(BaseModel):
     )
 
 
+
+class SendResumeEmailRequest(BaseModel):
+    """Payload to send enhanced resume via Resend."""
+    recipient_email: str = Field(..., description="Destination email address")
+    sections: List[ResumeSection] = Field(default_factory=list, description="Resume sections to include")
+    accepted_bullets: List[AcceptedBulletExportItem] = Field(
+        default_factory=list,
+        description="List of user-accepted bullet point replacements"
+    )
+    filename: Optional[str] = Field(default="enhanced_resume.docx", description="Attached document filename")
+    subject: Optional[str] = Field(default=None, description="Email subject line")
+    message: Optional[str] = Field(default=None, description="Optional custom message body")
+    target_role: Optional[str] = Field(default="", description="Target job role")
+
+
+class SendResumeEmailResponse(BaseModel):
+    """Response returned after attempting to send resume email."""
+    status: Literal["success", "error", "api_key_missing"]
+    message: str
+    email_id: Optional[str] = None
+    recipient: str
+
+
+# ── ATS Scoring Models ───────────────────────────────────────────────────
+
+
+class AtsBulletScoreRequest(BaseModel):
+    """Payload to score an individual bullet and compute delta."""
+    original: str = Field(..., description="Original raw bullet text")
+    improved: str = Field(..., description="Enhanced or edited bullet text")
+    job_description: Optional[str] = Field(default="", description="Optional target job description")
+
+
+class AtsBulletScoreResponse(BaseModel):
+    """Result of individual bullet ATS scoring and delta analysis."""
+    original_score: float = Field(..., description="ATS score of the original bullet (0-100)")
+    improved_score: float = Field(..., description="ATS score of the improved bullet (0-100)")
+    delta: float = Field(..., description="Net ATS point change (+ or -)")
+    breakdown: List[str] = Field(default_factory=list, description="List of reasons explaining the score delta")
+    matched_keywords: List[str] = Field(default_factory=list, description="Target keywords present in improved text")
+
+
+class AtsResumeScoreRequest(BaseModel):
+    """Payload to evaluate the composite ATS score of the entire resume."""
+    sections: List[Dict[str, Any]] = Field(..., description="Structured resume sections with bullets")
+    job_description: Optional[str] = Field(default="", description="Optional target job description")
+    target_role: Optional[str] = Field(default="", description="Optional target role title")
+    accepted_bullets: Optional[Dict[str, str]] = Field(default=None, description="Map of bullet ID to accepted improved text")
+
+
+class AtsResumeScoreResponse(BaseModel):
+    """Composite ATS evaluation across Keywords, Impact, Brevity, and Structure."""
+    overall_score: float = Field(..., description="Composite ATS score (0 to 100)")
+    keyword_score: float = Field(..., description="Pillar 1: JD keyword and skill alignment (0-100)")
+    impact_score: float = Field(..., description="Pillar 2: Action verb and metric density (0-100)")
+    brevity_score: float = Field(default=80.0, description="Pillar 3: Brevity, readability, and buzzword audit (0-100)")
+    structure_score: float = Field(..., description="Pillar 4: Formatting and section parsability (0-100)")
+    matched_keywords: List[str] = Field(default_factory=list, description="Matched technical skills & tools")
+    missing_keywords: List[str] = Field(default_factory=list, description="Missing keywords requested by target role/JD")
+    recommendations: List[str] = Field(default_factory=list, description="Actionable recommendations to boost ATS score")
+    total_bullets_analyzed: int = Field(default=0, description="Total bullet points processed")
+    buzzwords_detected: List[str] = Field(default_factory=list, description="Vague buzzwords or cliches detected")
+    repetitive_verbs: List[str] = Field(default_factory=list, description="Action verbs repeated excessively")
+    xyz_compliance_rate: float = Field(default=0.0, description="Percentage of bullets meeting Google X-Y-Z formula")
+
+
+class JdGapRequest(BaseModel):
+    """Payload to extract skills gap between JD and resume text."""
+    job_description: str = Field(..., min_length=1, description="Target job description")
+    resume_text: str = Field(..., description="Extracted resume text")
+
+
+class JdGapResponse(BaseModel):
+    """Skills gap audit comparing JD requirements with resume content."""
+    matched_skills: List[str] = Field(default_factory=list, description="Skills present in both JD and resume")
+    missing_skills: List[str] = Field(default_factory=list, description="Skills in JD missing from resume")
+    match_percentage: float = Field(..., description="Percentage of JD keywords matched (0 to 100)")
+    recommendations: List[str] = Field(default_factory=list, description="Guidance to close the gap truthfully")
+
+
+# ── Project & History Memory Models ─────────────────────────────────────
+
+
+class ProjectCreateRequest(BaseModel):
+    """Payload to create a new resume optimization project."""
+    title: Optional[str] = Field(default="Untitled Resume", description="Project name")
+    target_role: Optional[str] = Field(default="", description="Target job title")
+    job_description: Optional[str] = Field(default="", description="Target job description")
+    writing_style: Optional[str] = Field(default="achievement", description="Selected writing style")
+    supporting_facts: Optional[str] = Field(default="", description="Verified candidate facts")
+    sections: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="Parsed sections")
+    filename: Optional[str] = Field(default="resume.txt", description="Source filename")
+    raw_text: Optional[str] = Field(default="", description="Extracted raw text")
+    enhanced_bullets: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="Enhanced bullets with review state")
+
+
+class ProjectUpdateRequest(BaseModel):
+    """Payload to update an existing project."""
+    title: Optional[str] = None
+    target_role: Optional[str] = None
+    job_description: Optional[str] = None
+    writing_style: Optional[str] = None
+    supporting_facts: Optional[str] = None
+    sections: Optional[List[Dict[str, Any]]] = None
+    enhanced_bullets: Optional[List[Dict[str, Any]]] = None
+
+
+class BulletRevisionItem(BaseModel):
+    """A single bullet revision audit record."""
+    id: str
+    bullet_id: str
+    section_title: str
+    original_text: str
+    current_text: str
+    status: str
+    decision_reason: Optional[str] = None
+    ats_delta: Optional[float] = 0.0
+    variation_angle: Optional[str] = None
+    created_at: str
+
+
+class ProjectSummary(BaseModel):
+    """Summary item for the project history list."""
+    id: str
+    title: str
+    target_role: str
+    writing_style: str
+    bullet_count: int
+    accepted_count: int = 0
+    rejected_count: int = 0
+    pending_count: int = 0
+    ats_score: Optional[float] = None
+    created_at: str
+    updated_at: str
+
+
+class ProjectDetail(BaseModel):
+    """Complete project state with sections, enhanced bullets, and revision history."""
+    id: str
+    title: str
+    target_role: str
+    job_description: str
+    writing_style: str
+    supporting_facts: str
+    filename: str
+    raw_text: Optional[str] = ""
+    sections: List[Dict[str, Any]]
+    enhanced_bullets: List[Dict[str, Any]] = Field(default_factory=list, description="Saved enhanced bullets")
+    revisions: List[BulletRevisionItem]
+    created_at: str
+    updated_at: str
+
+
+class SnapshotCreateRequest(BaseModel):
+    """Payload to save a point-in-time project snapshot."""
+    name: str = Field(default="Checkpoint", description="Snapshot label")
+    state_json: str = Field(..., description="Serialized project state JSON")
+
+
+class UploadedResumeItem(BaseModel):
+    """An uploaded resume stored in the library for quick reuse across optimizations."""
+    id: str
+    project_id: str
+    filename: str
+    file_type: str = "parsed"
+    bullet_count: int = 0
+    section_count: int = 0
+    sections: List[Dict[str, Any]] = Field(default_factory=list)
+    raw_text: Optional[str] = ""
+    created_at: str

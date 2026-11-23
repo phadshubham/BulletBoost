@@ -12,6 +12,31 @@ dist
 dist-ssr
 *.local
 
+# Environment variables & secrets
+.env
+.env.*
+backend/.env
+backend/.env.*
+
+# Local databases & storage
+*.db
+*.sqlite
+*.sqlite3
+backend/data/*.db
+
+# Python & testing cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Antigravity agent & scratch files
+.agent/
+.system_generated/
+scratch/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

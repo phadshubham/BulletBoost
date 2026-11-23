@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Zap, Menu, X, RefreshCw, Loader2 } from 'lucide-react';
+import { Zap, Menu, X, RefreshCw, Loader2, FolderOpen } from 'lucide-react';
 import { useAppState, useAppDispatch, refreshBackendHealth } from '../../context/AppContext';
+import { ProjectDrawer } from './ProjectDrawer';
 
 const navLinks = [
   { to: '/', label: 'Home' },
@@ -13,8 +14,15 @@ const navLinks = [
 export function Header() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { backendHealth } = useAppState();
+  const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
+  const { backendHealth, isSavingProject, lastSavedAt } = useAppState();
   const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    const handleOpenDrawer = () => setProjectDrawerOpen(true);
+    window.addEventListener('open-project-drawer', handleOpenDrawer);
+    return () => window.removeEventListener('open-project-drawer', handleOpenDrawer);
+  }, []);
 
   const renderBackendBadge = (isMobile: boolean = false) => {
     if (backendHealth.status === 'connected') {
@@ -105,6 +113,22 @@ export function Header() {
               );
             })}
           </nav>
+          
+          {/* History / Project Drawer trigger */}
+          <button
+            onClick={() => setProjectDrawerOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-charcoal hover:text-forest bg-neutral-100 hover:bg-sage-light rounded-md border border-neutral-200 transition-colors"
+            title="Open saved resumes and revision history"
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-forest" />
+            <span>Resumes & History</span>
+            {isSavingProject ? (
+              <Loader2 className="w-3 h-3 animate-spin text-forest ml-0.5" />
+            ) : lastSavedAt ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 ml-0.5" title="Auto-saved to local DB" />
+            ) : null}
+          </button>
+
           <div className="h-4 w-px bg-border" />
           {renderBackendBadge(false)}
         </div>
@@ -130,6 +154,16 @@ export function Header() {
           aria-label="Mobile navigation"
         >
           <div className="max-w-6xl mx-auto px-4 py-2 flex flex-col gap-0.5">
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setProjectDrawerOpen(true);
+              }}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-forest bg-sage-light rounded-md text-left mb-1"
+            >
+              <FolderOpen className="w-4 h-4" />
+              <span>Resumes & History</span>
+            </button>
             {navLinks.map(({ to, label }) => {
               const isActive =
                 to === '/'
@@ -156,6 +190,12 @@ export function Header() {
           </div>
         </nav>
       )}
+
+      {/* Project & Memory Drawer */}
+      <ProjectDrawer
+        isOpen={projectDrawerOpen}
+        onClose={() => setProjectDrawerOpen(false)}
+      />
     </header>
   );
 }

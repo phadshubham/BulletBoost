@@ -1,5 +1,9 @@
 import os
 from typing import List
+from dotenv import load_dotenv
+
+# Automatically load environment variables from .env if present
+load_dotenv()
 
 
 class Settings:
@@ -48,6 +52,10 @@ class Settings:
     BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     MODEL_DIR: str = os.getenv("MODEL_DIR", os.path.join(BASE_DIR, "models"))
     CLASSIFIER_PATH: str = os.getenv("CLASSIFIER_PATH", os.path.join(MODEL_DIR, "bullet_classifier.joblib"))
+
+    # Resend Email Configuration
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+    RESEND_FROM_EMAIL: str = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
     EVALUATION_REPORT_PATH: str = os.getenv("EVALUATION_REPORT_PATH", os.path.join(MODEL_DIR, "evaluation_report.json"))
     DATASET_PATH: str = os.getenv("DATASET_PATH", os.path.join(BASE_DIR, "data", "bullet_quality_dataset.csv"))
 

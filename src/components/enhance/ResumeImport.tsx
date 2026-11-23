@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type DragEvent } from 'react';
+import { useState, useRef, useCallback, useEffect, type DragEvent } from 'react';
 import {
   Upload,
   FileText,
@@ -9,12 +9,15 @@ import {
   Loader2,
   Sparkles,
   RefreshCw,
+  FolderOpen,
+  Clock,
+  ArrowRight,
 } from 'lucide-react';
 import { Button, Textarea } from '../ui';
 import { useAppState, useAppDispatch } from '../../context/AppContext';
 import { getDemoSections } from '../../data/demo';
-import { parseResumeFile, parseResumeText, API_BASE_URL, ApiError } from '../../services/api';
-import type { ImportMethod, ParseResumeResponse } from '../../types';
+import { parseResumeFile, parseResumeText, getUploadedResumes, API_BASE_URL, ApiError } from '../../services/api';
+import type { ImportMethod, ParseResumeResponse, UploadedResumeItem } from '../../types';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ACCEPTED_TYPES = [
@@ -41,6 +44,24 @@ export function ResumeImport() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [apiErrorObj, setApiErrorObj] = useState<ApiError | null>(null);
 
+  // Resume Library state
+  const [libraryResumes, setLibraryResumes] = useState<UploadedResumeItem[]>([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
+
+  const fetchLibrary = useCallback(async () => {
+    setLoadingLibrary(true);
+    try {
+      const items = await getUploadedResumes();
+      setLibraryResumes(items);
+      setLibraryLoaded(true);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingLibrary(false);
+    }
+  }, []);
+
   const activeTab = state.importMethod;
 
   const setTab = (method: ImportMethod) => {
@@ -50,7 +71,14 @@ export function ResumeImport() {
     setPasteError(null);
     setApiError(null);
     setApiErrorObj(null);
+    if (method === 'library' && !libraryLoaded) {
+      fetchLibrary();
+    }
   };
+
+  useEffect(() => {
+    fetchLibrary();
+  }, [fetchLibrary]);
 
   const validateFile = useCallback((file: File): string | null => {
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
@@ -247,6 +275,27 @@ export function ResumeImport() {
           <ClipboardPaste className="w-4 h-4" />
           Paste Resume Text
         </button>
+        <button
+          className={`
+            flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2
+            transition-colors duration-150 focus-ring -mb-px cursor-pointer
+            ${
+              activeTab === 'library'
+                ? 'border-forest text-forest'
+                : 'border-transparent text-muted hover:text-charcoal'
+            }
+          `}
+          onClick={() => setTab('library')}
+          disabled={isParsing}
+        >
+          <FolderOpen className="w-4 h-4" />
+          Resume Library
+          {libraryResumes.length > 0 && (
+            <span className="text-[10px] bg-forest/10 text-forest font-semibold px-1.5 py-0.2 rounded-full">
+              {libraryResumes.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Upload panel */}
@@ -363,6 +412,104 @@ export function ResumeImport() {
         </div>
       )}
 
+      {/* Resume Library panel */}
+      {activeTab === 'library' && (
+        <div className="animate-fade-in space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-border">
+            <div>
+              <h3 className="text-sm font-semibold text-charcoal">Previously Uploaded Base Resumes</h3>
+              <p className="text-xs text-muted">
+                Pick any previously parsed resume to start a fresh optimization for a new job or role.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchLibrary}
+              disabled={loadingLibrary}
+              className="text-xs h-7 gap-1"
+            >
+              <RefreshCw className={`w-3 h-3 ${loadingLibrary ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+
+          {loadingLibrary ? (
+            <div className="py-12 flex flex-col items-center justify-center text-muted gap-2">
+              <Loader2 className="w-6 h-6 animate-spin text-forest" />
+              <span className="text-xs">Loading base resumes from local SQLite database...</span>
+            </div>
+          ) : libraryResumes.length === 0 ? (
+            <div className="py-12 text-center text-muted border-2 border-dashed border-border rounded-xl p-6">
+              <FileText className="w-10 h-10 mx-auto text-neutral-300 mb-2" />
+              <p className="text-sm font-semibold text-charcoal">No base resumes found yet</p>
+              <p className="text-xs text-muted mt-1 max-w-sm mx-auto">
+                Upload a resume file or paste text first. It will be stored in your local memory library for instant re-use anytime.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTab('upload')}
+                className="mt-4 text-xs"
+              >
+                Upload First Resume
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {libraryResumes.map((r) => (
+                <div
+                  key={r.id}
+                  className="bg-white border border-border hover:border-forest/40 rounded-xl p-4 transition-all hover:shadow-xs flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-forest/10 flex items-center justify-center text-forest shrink-0">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-charcoal text-sm truncate" title={r.filename}>
+                            {r.filename}
+                          </h4>
+                          <span className="text-[11px] text-muted flex items-center gap-1 mt-0.5">
+                            <Clock className="w-3 h-3" />
+                            {new Date(r.created_at || (r as any).uploaded_at || Date.now()).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-2 flex-wrap text-xs text-muted">
+                      <span className="bg-neutral-100 text-charcoal px-2 py-0.5 rounded font-medium">
+                        {r.bullet_count} bullets
+                      </span>
+                      <span className="bg-neutral-100 text-charcoal px-2 py-0.5 rounded font-medium">
+                        {r.section_count} sections
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-neutral-100 flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => {
+                        dispatch({ type: 'USE_LIBRARY_RESUME', resume: r });
+                      }}
+                      className="text-xs gap-1.5 w-full sm:w-auto"
+                    >
+                      <span>Use this Resume</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* API Error Message with Diagnostics */}
       {apiError && (
         <div className="mt-4 p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800 animate-fade-in">
@@ -472,23 +619,25 @@ export function ResumeImport() {
       </div>
 
       {/* Continue */}
-      <div className="flex justify-end mt-6">
-        <Button
-          onClick={handleContinue}
-          disabled={!canContinue || isParsing}
-          size="lg"
-          className="min-w-[190px]"
-        >
-          {isParsing ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Parsing Resume…
-            </span>
-          ) : (
-            'Continue to Analysis'
-          )}
-        </Button>
-      </div>
+      {activeTab !== 'library' && (
+        <div className="flex justify-end mt-6">
+          <Button
+            onClick={handleContinue}
+            disabled={!canContinue || isParsing}
+            size="lg"
+            className="min-w-[190px]"
+          >
+            {isParsing ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Parsing Resume…
+              </span>
+            ) : (
+              'Continue to Analysis'
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

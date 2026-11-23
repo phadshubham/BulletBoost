@@ -479,3 +479,227 @@ export async function exportResumeDocx(
     );
   }
 }
+
+// ── Project Memory & Revision APIs ──────────────────────────────────────
+
+export async function getProjects(): Promise<import('../types').ProjectSummary[]> {
+  const url = buildApiUrl('/api/projects');
+  try {
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function getUploadedResumes(): Promise<import('../types').UploadedResumeItem[]> {
+  const url = buildApiUrl('/api/projects/library/resumes');
+  try {
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function getProject(id: string): Promise<import('../types').ProjectDetail | null> {
+  const url = buildApiUrl(`/api/projects/${id}`);
+  try {
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function createProject(payload: {
+  title?: string;
+  target_role?: string;
+  job_description?: string;
+  writing_style?: string;
+  supporting_facts?: string;
+  sections?: import('../types').ResumeSection[];
+  enhanced_bullets?: import('../types').EnhancedBullet[];
+  filename?: string;
+  raw_text?: string;
+}): Promise<import('../types').ProjectDetail | null> {
+  const url = buildApiUrl('/api/projects');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function updateProject(
+  id: string,
+  payload: {
+    title?: string;
+    target_role?: string;
+    job_description?: string;
+    writing_style?: string;
+    supporting_facts?: string;
+    sections?: import('../types').ResumeSection[];
+    enhanced_bullets?: import('../types').EnhancedBullet[];
+  }
+): Promise<import('../types').ProjectDetail | null> {
+  const url = buildApiUrl(`/api/projects/${id}`);
+  try {
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function forkProject(id: string, newTargetRole: string): Promise<import('../types').ProjectDetail | null> {
+  const url = buildApiUrl(`/api/projects/${id}/fork?new_target_role=${encodeURIComponent(newTargetRole)}`);
+  try {
+    const res = await fetch(url, { method: 'POST' });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteProject(id: string): Promise<boolean> {
+  const url = buildApiUrl(`/api/projects/${id}`);
+  try {
+    const res = await fetch(url, { method: 'DELETE' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ── ATS Scoring APIs ───────────────────────────────────────────────────
+
+export async function scoreResumeAts(
+  sections: import('../types').ResumeSection[],
+  jobDescription?: string,
+  targetRole?: string,
+  acceptedBullets?: Record<string, string>
+): Promise<import('../types').AtsResumeScore | null> {
+  const url = buildApiUrl('/api/ats/score-resume');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sections,
+        job_description: jobDescription || '',
+        target_role: targetRole || '',
+        accepted_bullets: acceptedBullets || null,
+      }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function scoreBulletAts(
+  original: string,
+  improved: string,
+  jobDescription?: string
+): Promise<import('../types').AtsBulletScore | null> {
+  const url = buildApiUrl('/api/ats/score-bullet');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        original,
+        improved,
+        job_description: jobDescription || '',
+      }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function getJdGap(
+  jobDescription: string,
+  resumeText: string
+): Promise<import('../types').JdGapData | null> {
+  const url = buildApiUrl('/api/ats/jd-gap');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        job_description: jobDescription,
+        resume_text: resumeText,
+      }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ── Resend Email API ───────────────────────────────────────────────────
+
+export async function sendResumeEmail(payload: {
+  recipient_email: string;
+  sections: import('../types').ResumeSection[];
+  accepted_bullets: import('../types').AcceptedBulletExportItem[];
+  filename?: string;
+  subject?: string;
+  message?: string;
+  target_role?: string;
+}): Promise<{
+  status: 'success' | 'error' | 'api_key_missing';
+  message: string;
+  email_id?: string;
+  recipient: string;
+}> {
+  const url = buildApiUrl('/api/send-resume');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed to send email' }));
+      let errorMsg = 'Email sending failed';
+      if (typeof err.detail === 'string') {
+        errorMsg = err.detail;
+      } else if (Array.isArray(err.detail)) {
+        errorMsg = err.detail
+          .map((e: any) => e.msg || e.message || (typeof e === 'string' ? e : JSON.stringify(e)))
+          .join('; ');
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      throw new Error(errorMsg);
+    }
+    return await res.json();
+  } catch (err: unknown) {
+    if (err instanceof TypeError && (err as Error).message.toLowerCase().includes('fetch')) {
+      throw new Error('Cannot connect to backend server. Please verify backend is running.');
+    }
+    throw err;
+  }
+}

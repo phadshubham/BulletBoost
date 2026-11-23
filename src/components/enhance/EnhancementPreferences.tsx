@@ -12,12 +12,14 @@ import {
 import { Button, Input, Textarea, Badge } from '../ui';
 import { useAppState, useAppDispatch } from '../../context/AppContext';
 import { getDemoEnhancedBullets } from '../../data/demo';
-import { getOllamaStatus, enhanceBullets } from '../../services/api';
+import { getOllamaStatus, enhanceBullets, getJdGap } from '../../services/api';
 import { enhanceBulletsWithHeuristics } from '../../services/heuristicEnhancer';
+import { JdGapMatrix } from './JdGapMatrix';
 import type {
   WritingStyle,
   OllamaStatus,
   SelectedBulletPayload,
+  JdGapData,
 } from '../../types';
 
 const writingStyles: { value: WritingStyle; label: string; description: string }[] = [
@@ -59,6 +61,29 @@ export function EnhancementPreferences() {
   const [enhanceError, setEnhanceError] = useState<string | null>(null);
   const [engineChoice, setEngineChoice] = useState<EngineChoice>('heuristic');
   const [autoFallback, setAutoFallback] = useState(true);
+  const [gapData, setGapData] = useState<JdGapData | null>(null);
+
+  useEffect(() => {
+    if (!state.preferences.jobDescription.trim()) {
+      setGapData(null);
+      return;
+    }
+    const fullResumeText = state.sections
+      .map((s) => s.title + ' ' + s.bullets.map((b) => b.text).join(' '))
+      .join(' ');
+    const timer = setTimeout(() => {
+      getJdGap(state.preferences.jobDescription, fullResumeText).then((res: import('../../types').JdGapData | null) => {
+        if (res) setGapData(res);
+      });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [state.preferences.jobDescription, state.sections]);
+
+  const handleAddSkillAsFact = (skill: string) => {
+    setSupportingFacts((prev) =>
+      prev ? `${prev}, verified experience with ${skill}` : `Verified experience with ${skill}`
+    );
+  };
 
   const selectedCount = useMemo(() => {
     return state.sections.reduce(
@@ -230,7 +255,15 @@ export function EnhancementPreferences() {
       }, 120000);
 
       dispatch({ type: 'SET_DEMO_MODE', isDemo: false });
-      dispatch({ type: 'SET_ENHANCED_BULLETS', bullets: response.bullets });
+      const normalizedBullets = (response.bullets || []).map((b: any) => ({
+        ...b,
+        originalBulletId: b.originalBulletId || b.original_bullet_id || b.id,
+        sectionTitle: b.sectionTitle || b.section_title || '',
+        alternativeTexts: b.alternativeTexts || b.alternative_texts || [],
+        missingEvidence: b.missingEvidence || b.missing_evidence || [],
+        decisionReason: b.decisionReason || b.decision_reason,
+      }));
+      dispatch({ type: 'SET_ENHANCED_BULLETS', bullets: normalizedBullets });
       dispatch({ type: 'SET_PROCESSING', isProcessing: false });
       dispatch({ type: 'SET_STEP', step: 'results' });
     } catch (err: unknown) {
@@ -472,6 +505,13 @@ export function EnhancementPreferences() {
           }
           helperText="Aligns terminology and keywords with the role requirements."
         />
+
+        {/* Real-time JD Keyword Gap Analysis */}
+        {gapData && (
+          <div className="pt-1">
+            <JdGapMatrix gapData={gapData} onAddFact={handleAddSkillAsFact} />
+          </div>
+        )}
 
         {/* Supporting Facts Input */}
         <Textarea

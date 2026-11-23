@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
+from .database import engine, Base
 from .routers import (
     health_router,
     parser_router,
@@ -8,12 +9,18 @@ from .routers import (
     enhancer_router,
     classifier_router,
     exporter_router,
+    ats_router,
+    projects_router,
+    email_router,
 )
+
+# Ensure database tables exist
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Backend API for BulletBoost — AI-Powered Resume Enhancement",
+    description="Backend API for BulletBoost — AI-Powered Resume Enhancement & ATS Optimization",
 )
 
 # Configure CORS
@@ -33,6 +40,9 @@ app.include_router(ollama_router)
 app.include_router(enhancer_router)
 app.include_router(classifier_router)
 app.include_router(exporter_router)
+app.include_router(ats_router)
+app.include_router(projects_router)
+app.include_router(email_router)
 
 
 @app.get("/")
@@ -41,4 +51,5 @@ def root():
         "message": f"Welcome to {settings.APP_NAME} v{settings.APP_VERSION}",
         "docs_url": "/docs",
         "health_check": "/api/health",
+        "features": ["ats_scoring", "project_history", "multi_angle_enhancer"]
     }

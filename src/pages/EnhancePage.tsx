@@ -5,6 +5,7 @@ import { ResumeImport } from '../components/enhance/ResumeImport';
 import { SectionAnalysis } from '../components/enhance/SectionAnalysis';
 import { EnhancementPreferences } from '../components/enhance/EnhancementPreferences';
 import { ResultsReview } from '../components/enhance/ResultsReview';
+import { SessionOverview } from '../components/enhance/SessionOverview';
 import { Button } from '../components/ui';
 import { useAppState, useAppDispatch } from '../context/AppContext';
 import { enhanceBulletsWithHeuristics } from '../services/heuristicEnhancer';
@@ -173,12 +174,18 @@ export function EnhancePage() {
 
       {/* Step content */}
       {!isProcessing && (
-        <div className="bg-white border border-border rounded-lg p-5 sm:p-7">
-          {step === 'import' && <ResumeImport />}
-          {step === 'analysis' && <SectionAnalysis />}
-          {step === 'preferences' && <EnhancementPreferences />}
-          {step === 'results' && <ResultsReview />}
-        </div>
+        <>
+          {step === 'overview' ? (
+            <SessionOverview onOpenDrawer={() => window.dispatchEvent(new CustomEvent('open-project-drawer'))} />
+          ) : (
+            <div className="bg-white border border-border rounded-lg p-5 sm:p-7">
+              {step === 'import' && <ResumeImport />}
+              {step === 'analysis' && <SectionAnalysis />}
+              {step === 'preferences' && <EnhancementPreferences />}
+              {step === 'results' && <ResultsReview />}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Button, Badge, DemoIndicator } from '../ui';
 import { useAppState, useAppDispatch } from '../../context/AppContext';
+import { AtsScoreGauge } from './AtsScoreGauge';
 
 export function SectionAnalysis() {
   const state = useAppState();
@@ -90,6 +91,13 @@ export function SectionAnalysis() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Baseline ATS Score */}
+      {state.atsScore && (
+        <div className="mb-5">
+          <AtsScoreGauge score={state.atsScore} />
         </div>
       )}
 

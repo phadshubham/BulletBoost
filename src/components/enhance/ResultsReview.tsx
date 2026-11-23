@@ -12,12 +12,21 @@ import {
   ArrowRight,
   CheckCircle2,
   Info,
+  Sparkles,
+  Mail,
+  Send,
+  Loader2,
 } from 'lucide-react';
 import { Button, Badge, DemoIndicator, StatusIndicator } from '../ui';
 import { useAppState, useAppDispatch } from '../../context/AppContext';
 import { findNextPendingBulletId } from '../../utils/review';
-import { classifyBullets, enhanceBullets, exportResumeDocx } from '../../services/api';
+import { classifyBullets, enhanceBullets, exportResumeDocx, sendResumeEmail } from '../../services/api';
 import { enhanceSingleBulletHeuristically, isCandidateNoOp } from '../../services/heuristicEnhancer';
+import { calculateDeltaLocal } from '../../services/atsCalculator';
+import { AtsScoreGauge } from './AtsScoreGauge';
+import { VisualDiffViewer } from './VisualDiffViewer';
+import { EvidenceInterviewer } from './EvidenceInterviewer';
+import { PageBudgetWarning } from './PageBudgetWarning';
 import type {
   FilterStatus,
   EnhancedBullet,
@@ -157,6 +166,67 @@ export function ResultsReview() {
   const [showFinalReview, setShowFinalReview] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [regenerateError, setRegenerateError] = useState<string | null>(null);
+  const [showDiffId, setShowDiffId] = useState<string | null>(null);
+  const [interviewBulletId, setInterviewBulletId] = useState<string | null>(null);
+
+  const handleAddEvidenceToBullet = async (bullet: EnhancedBullet, evidence: string) => {
+    setRegeneratingId(bullet.id);
+    try {
+      const res = await enhanceBullets(
+        {
+          bullets: [
+            {
+              id: bullet.id,
+              text: bullet.original,
+              section_title: bullet.sectionTitle,
+              section_type: 'experience',
+            },
+          ],
+          target_role: state.preferences.targetRole || 'Software Professional',
+          job_description: state.preferences.jobDescription,
+          writing_style: state.preferences.writingStyle,
+          scope: state.preferences.scope,
+          supporting_facts: evidence,
+        },
+        60000
+      );
+
+      if (res.bullets && res.bullets.length > 0) {
+        const reg = res.bullets[0];
+        dispatch({
+          type: 'UPDATE_ENHANCED_BULLET',
+          bullet: {
+            ...bullet,
+            improved: reg.improved,
+            editedImproved: null,
+            explanation: `Enhanced with candidate evidence: "${evidence}"`,
+            status: 'pending',
+            warnings: reg.warnings || [],
+          },
+        });
+      }
+    } catch {
+      const fallback = enhanceSingleBulletHeuristically(bullet.original, 1, {
+        targetRole: state.preferences.targetRole,
+        writingStyle: state.preferences.writingStyle,
+        supportingFacts: evidence,
+      });
+      if (fallback.improved) {
+        dispatch({
+          type: 'UPDATE_ENHANCED_BULLET',
+          bullet: {
+            ...bullet,
+            improved: fallback.improved,
+            editedImproved: null,
+            explanation: `Enhanced with candidate evidence: "${evidence}"`,
+            status: 'pending',
+          },
+        });
+      }
+    } finally {
+      setRegeneratingId(null);
+    }
+  };
 
   // Map of card DOM elements for smooth scrolling
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -617,6 +687,11 @@ function validateEditedText(
         </div>
       </div>
 
+      {/* ATS Live Score Gauge & Optimization Dashboard */}
+      <div className="mb-5">
+        <AtsScoreGauge score={state.atsScore || null} />
+      </div>
+
       {/* Summary bar */}
       <div className="flex flex-wrap items-center gap-2 mb-5 p-3 bg-sage-light rounded-md">
         <Badge variant="default">{summary.total} total</Badge>
@@ -756,6 +831,7 @@ function validateEditedText(
                 isCandidateNoOp(bullet.original, bullet.editedImproved ?? bullet.improved));
             const displayImproved =
               bullet.editedImproved ?? bullet.improved;
+            const atsDelta = calculateDeltaLocal(bullet.original, displayImproved || bullet.original);
 
             return (
               <div
@@ -818,6 +894,15 @@ function validateEditedText(
                         </>
                       )}
                       {statusBadge(bullet.status)}
+                      {atsDelta.delta > 0 && !isNoOp && (
+                        <span
+                          className="flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200"
+                          title={atsDelta.breakdown.join(' · ')}
+                        >
+                          <Sparkles className="w-3 h-3 text-emerald-600" />
+                          Positively Affects ATS Score
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-charcoal line-clamp-1">
                       {bullet.original}
@@ -1066,6 +1151,51 @@ function validateEditedText(
                             </p>
                           )}
 
+                          {/* Controls for Visual Diff, Context Interviewer, Page Budget */}
+                          {!isEditing && displayImproved && (
+                            <div className="space-y-2 mt-2">
+                              <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowDiffId(showDiffId === bullet.id ? null : bullet.id)}
+                                  className="text-forest hover:text-forest-dark font-medium underline flex items-center gap-1 cursor-pointer"
+                                >
+                                  {showDiffId === bullet.id ? 'Hide Word-Level Diff' : 'View Word-Level Diff'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setInterviewBulletId(interviewBulletId === bullet.id ? null : bullet.id)}
+                                  className="text-indigo-700 hover:text-indigo-900 font-medium flex items-center gap-1 cursor-pointer bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200"
+                                >
+                                  💡 Add Verified Evidence / Context
+                                </button>
+                              </div>
+
+                              {showDiffId === bullet.id && (
+                                <VisualDiffViewer original={bullet.original} improved={displayImproved} />
+                              )}
+
+                              <EvidenceInterviewer
+                                isOpen={interviewBulletId === bullet.id}
+                                bulletText={bullet.original}
+                                onClose={() => setInterviewBulletId(null)}
+                                onAddEvidence={(ev) => handleAddEvidenceToBullet(bullet, ev)}
+                              />
+
+                              <PageBudgetWarning
+                                wordCount={atsDelta.wordCount}
+                                isOrphan={atsDelta.isOrphan}
+                                onTighten={() => {
+                                  const words = displayImproved.split(' ');
+                                  if (words.length > 5) {
+                                    setEditingId(bullet.id);
+                                    setEditText(words.slice(0, words.length - 2).join(' ') + '.');
+                                  }
+                                }}
+                              />
+                            </div>
+                          )}
+
                           {/* Model comparison notice */}
                           {bullet.originalQuality &&
                             bullet.improvedQuality &&
@@ -1310,11 +1440,83 @@ function FinalReview({
   importedFileName?: string | null;
   onBack: () => void;
 }) {
+  const state = useAppState();
   const accepted = bullets.filter((b) => b.status === 'accepted');
   const [copiedAll, setCopiedAll] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
+
+  // Resend Email Integration states
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState('');
+  const [emailSubject, setEmailSubject] = useState(
+    state.preferences.targetRole
+      ? `Optimized Resume Application — ${state.preferences.targetRole}`
+      : 'Optimized Resume Application'
+  );
+  const [emailMessage, setEmailMessage] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<{
+    type: 'success' | 'warning' | 'error';
+    message: string;
+  } | null>(null);
+
+  const handleSendEmail = async () => {
+    if (!emailRecipient.trim() || !emailRecipient.includes('@')) {
+      setEmailStatus({
+        type: 'error',
+        message: 'Please provide a valid recipient email address (e.g. recruiter@company.com).',
+      });
+      return;
+    }
+
+    setIsSendingEmail(true);
+    setEmailStatus(null);
+    try {
+      const acceptedBulletsPayload = accepted.map((b) => ({
+        bullet_id: b.originalBulletId || (b as any).original_bullet_id || b.id,
+        text: (b.editedImproved ?? b.improved ?? b.original).trim(),
+      }));
+
+      let baseName = 'BulletBoost_Enhanced_Resume.docx';
+      if (importedFileName) {
+        const nameWithoutExt = importedFileName.replace(/\.[^/.]+$/, '');
+        baseName = `${nameWithoutExt}_enhanced.docx`;
+      }
+
+      const res = await sendResumeEmail({
+        recipient_email: emailRecipient.trim(),
+        sections: sections,
+        accepted_bullets: acceptedBulletsPayload,
+        filename: baseName,
+        subject: emailSubject,
+        message: emailMessage,
+        target_role: state.preferences.targetRole,
+      });
+
+      if (res.status === 'success') {
+        setEmailStatus({
+          type: 'success',
+          message: `Resume successfully delivered to ${res.recipient} via Resend! (ID: ${res.email_id || 'sent'})`,
+        });
+      } else if (res.status === 'api_key_missing') {
+        setEmailStatus({
+          type: 'warning',
+          message: 'Resend API key is not configured. Add RESEND_API_KEY to your backend .env file to enable live email delivery via Resend (https://resend.com).',
+        });
+      } else {
+        setEmailStatus({ type: 'error', message: res.message });
+      }
+    } catch (err: unknown) {
+      setEmailStatus({
+        type: 'error',
+        message: (err as Error).message || 'Failed to send resume email.',
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
 
   const handleCopyAll = async () => {
     const text = accepted
@@ -1335,7 +1537,7 @@ function FinalReview({
     setExportSuccess(null);
     try {
       const acceptedBulletsPayload = accepted.map((b) => ({
-        bullet_id: b.originalBulletId,
+        bullet_id: b.originalBulletId || (b as any).original_bullet_id || b.id,
         text: (b.editedImproved ?? b.improved ?? b.original).trim(),
       }));
 
@@ -1380,18 +1582,39 @@ function FinalReview({
         </p>
       </div>
 
+      {/* Final ATS Score Performance Dashboard */}
+      <div className="mb-6">
+        <AtsScoreGauge score={state.atsScore || null} />
+      </div>
+
       <div className="bg-white border border-border rounded-lg overflow-hidden shadow-xs">
-        {accepted.map((bullet, i) => (
-          <div
-            key={bullet.id}
-            className={`px-5 py-3.5 ${i > 0 ? 'border-t border-border/50' : ''}`}
-          >
-            <p className="text-xs text-muted mb-1">{bullet.sectionTitle}</p>
-            <p className="text-sm text-charcoal leading-relaxed">
-              • {bullet.editedImproved ?? bullet.improved ?? bullet.original}
-            </p>
-          </div>
-        ))}
+        {accepted.map((bullet, i) => {
+          const currentText = bullet.editedImproved ?? bullet.improved ?? bullet.original;
+          const atsDelta = calculateDeltaLocal(bullet.original, currentText);
+
+          return (
+            <div
+              key={bullet.id}
+              className={`px-5 py-3.5 ${i > 0 ? 'border-t border-border/50' : ''}`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-xs text-muted font-medium">{bullet.sectionTitle}</p>
+                {atsDelta.delta > 0 && (
+                  <span
+                    className="flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200"
+                    title={atsDelta.breakdown.join(' · ')}
+                  >
+                    <Sparkles className="w-3 h-3 text-emerald-600" />
+                    Positively Affects ATS Score
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-charcoal leading-relaxed">
+                • {currentText}
+              </p>
+            </div>
+          );
+        })}
       </div>
 
       {accepted.length === 0 && (
@@ -1422,6 +1645,95 @@ function FinalReview({
         />
       )}
 
+      {/* Resend Email Delivery Card */}
+      {showEmailModal && (
+        <div className="mt-4 p-5 rounded-xl border border-indigo-200 bg-indigo-50/40 animate-slide-down space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-charcoal text-sm flex items-center gap-2">
+              <Mail className="w-4 h-4 text-indigo-600" /> Deliver Enhanced Resume via Resend
+            </h4>
+            <span className="text-[11px] font-medium text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded">
+              https://resend.com
+            </span>
+          </div>
+          <p className="text-xs text-muted">
+            Auto-drafts a professional email with your enhanced Word document attached and dispatches via Resend API.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="block text-[11px] font-medium text-charcoal mb-1">
+                Recipient Email Address *
+              </label>
+              <input
+                type="email"
+                placeholder="e.g. recruiter@company.com"
+                value={emailRecipient}
+                onChange={(e) => setEmailRecipient(e.target.value)}
+                className="w-full text-xs px-3 py-2 border border-border rounded-lg bg-white focus:outline-none focus:border-forest"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-charcoal mb-1">
+                Subject Line
+              </label>
+              <input
+                type="text"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                className="w-full text-xs px-3 py-2 border border-border rounded-lg bg-white focus:outline-none focus:border-forest"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-charcoal mb-1">
+              Optional Note / Body Message
+            </label>
+            <textarea
+              rows={2}
+              placeholder="e.g. Please find my updated resume attached for the position."
+              value={emailMessage}
+              onChange={(e) => setEmailMessage(e.target.value)}
+              className="w-full text-xs px-3 py-2 border border-border rounded-lg bg-white focus:outline-none focus:border-forest resize-vertical"
+            />
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-[11px] text-muted italic">
+              Attached: {importedFileName ? `${importedFileName.replace(/\.[^/.]+$/, '')}_enhanced.docx` : 'BulletBoost_Enhanced_Resume.docx'}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowEmailModal(false);
+                  setEmailStatus(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                icon={isSendingEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                onClick={handleSendEmail}
+                disabled={isSendingEmail || !emailRecipient.trim()}
+              >
+                {isSendingEmail ? 'Sending via Resend...' : 'Send Email'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {emailStatus && (
+        <StatusIndicator
+          type={emailStatus.type}
+          message={emailStatus.message}
+          className="mt-2"
+        />
+      )}
+
       <div className="flex items-center justify-between mt-6">
         <Button variant="ghost" onClick={onBack}>
           Back to Review
@@ -1435,6 +1747,16 @@ function FinalReview({
             disabled={accepted.length === 0}
           >
             {copiedAll ? 'Copied!' : 'Copy All'}
+          </Button>
+          <Button
+            id="email-resume-btn"
+            variant="outline"
+            icon={<Mail className="w-4 h-4 text-forest" />}
+            onClick={() => setShowEmailModal(!showEmailModal)}
+            disabled={accepted.length === 0}
+            title="Draft and send enhanced resume via Resend"
+          >
+            Email Resume
           </Button>
           <Button
             id="export-resume-btn"

@@ -55,8 +55,8 @@ def test_generate_resume_docx_in_memory():
     doc = docx.Document(io.BytesIO(doc_bytes))
     full_text = "\n".join([p.text for p in doc.paragraphs]).upper()
 
-    # Check header
-    assert "JANE DOE RESUME" in full_text
+    # Ensure artificial title header is NOT injected into document body
+    assert "JANE DOE RESUME" not in full_text
     assert "PROFESSIONAL SUMMARY" in full_text
     assert "WORK EXPERIENCE" in full_text
 

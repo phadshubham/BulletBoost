@@ -18,7 +18,7 @@ import type {
   BulletQuality,
   BackendHealthState,
 } from '../types';
-import { API_BASE_URL, checkBackendHealth } from '../services/api';
+import { API_BASE_URL, checkBackendHealth, createProject, updateProject, scoreResumeAts } from '../services/api';
 
 // ── Initial state ───────────────────────────────────────────────────
 
@@ -93,6 +93,13 @@ type Action =
   | { type: 'SET_PROCESSING'; isProcessing: boolean }
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'SET_BACKEND_HEALTH'; health: BackendHealthState }
+  | { type: 'LOAD_PROJECT'; project: import('../types').ProjectDetail }
+  | { type: 'SET_ATS_SCORE'; score: import('../types').AtsResumeScore | null }
+  | { type: 'SET_ACTIVE_PROJECT_ID'; projectId: string | null }
+  | { type: 'SET_SAVING_STATUS'; isSaving: boolean; lastSavedAt?: string }
+  | { type: 'SET_BULLET_ATS_DELTA'; bulletId: string; delta: number; breakdown: string[] }
+  | { type: 'SET_BULLET_STYLE_VARIATION'; bulletId: string; variation: 'xyz' | 'executive' | 'technical' }
+  | { type: 'USE_LIBRARY_RESUME'; resume: import('../types').UploadedResumeItem }
   | { type: 'RESET' };
 
 // ── Reducer ─────────────────────────────────────────────────────────
@@ -293,6 +300,88 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_ERROR':
       return { ...state, error: action.error };
 
+    case 'SET_ATS_SCORE':
+      return { ...state, atsScore: action.score };
+
+    case 'SET_ACTIVE_PROJECT_ID':
+      return { ...state, activeProjectId: action.projectId };
+
+    case 'SET_SAVING_STATUS':
+      return {
+        ...state,
+        isSavingProject: action.isSaving,
+        lastSavedAt: action.lastSavedAt ?? state.lastSavedAt,
+      };
+
+    case 'SET_BULLET_ATS_DELTA': {
+      const enhancedBullets = state.enhancedBullets.map((b) => {
+        if (b.id !== action.bulletId) return b;
+        return {
+          ...b,
+          atsDelta: action.delta,
+          atsBreakdown: action.breakdown,
+        };
+      });
+      return { ...state, enhancedBullets };
+    }
+
+    case 'SET_BULLET_STYLE_VARIATION': {
+      const enhancedBullets = state.enhancedBullets.map((b) => {
+        if (b.id !== action.bulletId) return b;
+        return {
+          ...b,
+          styleVariation: action.variation,
+        };
+      });
+      return { ...state, enhancedBullets };
+    }
+
+    case 'LOAD_PROJECT': {
+      const proj = action.project;
+      const enhancedBullets = proj.enhanced_bullets || [];
+      return {
+        ...state,
+        activeProjectId: proj.id,
+        sections: proj.sections || [],
+        enhancedBullets: enhancedBullets,
+        pastedText: proj.raw_text || state.pastedText,
+        importedFile: proj.filename ? { name: proj.filename, size: 0, type: 'text/plain' } : state.importedFile,
+        preferences: {
+          targetRole: proj.target_role || '',
+          jobDescription: proj.job_description || '',
+          writingStyle: (proj.writing_style as any) || 'achievement',
+          scope: 'bullets',
+        },
+        step: 'overview',
+        error: null,
+      };
+    }
+
+    case 'USE_LIBRARY_RESUME': {
+      const r = action.resume;
+      const sections = (r.sections || []).map((s) => ({
+        ...s,
+        selected: true,
+        bullets: s.bullets.map((b) => ({ ...b, selected: true })),
+      }));
+      return {
+        ...state,
+        activeProjectId: null,
+        sections,
+        enhancedBullets: [],
+        pastedText: r.raw_text || '',
+        importedFile: { name: r.filename, size: 0, type: 'text/plain' },
+        preferences: {
+          targetRole: '',
+          jobDescription: '',
+          writingStyle: 'achievement',
+          scope: 'bullets',
+        },
+        step: 'preferences',
+        error: null,
+      };
+    }
+
     case 'RESET':
       return initialState;
 
@@ -341,6 +430,85 @@ export function AppProvider({ children }: { children: ReactNode }) {
       active = false;
     };
   }, []);
+
+  // Debounced Auto-Save to Local SQLite DB when sections, preferences, or enhanced bullets change
+  useEffect(() => {
+    if (!state.sections || state.sections.length === 0 || state.backendHealth.status !== 'connected') {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      dispatch({ type: 'SET_SAVING_STATUS', isSaving: true });
+      try {
+        if (state.activeProjectId) {
+          await updateProject(state.activeProjectId, {
+            title: state.preferences.targetRole ? `Resume - ${state.preferences.targetRole}` : (state.importedFile?.name || 'My Resume'),
+            target_role: state.preferences.targetRole,
+            job_description: state.preferences.jobDescription,
+            writing_style: state.preferences.writingStyle,
+            sections: state.sections,
+            enhanced_bullets: state.enhancedBullets,
+          });
+        } else {
+          const created = await createProject({
+            title: state.preferences.targetRole ? `Resume - ${state.preferences.targetRole}` : (state.importedFile?.name || 'My Resume'),
+            target_role: state.preferences.targetRole,
+            job_description: state.preferences.jobDescription,
+            writing_style: state.preferences.writingStyle,
+            sections: state.sections,
+            enhanced_bullets: state.enhancedBullets,
+            filename: state.importedFile?.name || 'resume.txt',
+            raw_text: state.pastedText,
+          });
+          if (created) {
+            dispatch({ type: 'SET_ACTIVE_PROJECT_ID', projectId: created.id });
+          }
+        }
+        dispatch({ type: 'SET_SAVING_STATUS', isSaving: false, lastSavedAt: new Date().toLocaleTimeString() });
+      } catch {
+        dispatch({ type: 'SET_SAVING_STATUS', isSaving: false });
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [state.sections, state.preferences, state.enhancedBullets, state.activeProjectId, state.backendHealth.status]);
+
+  // Recalculate ATS Score when sections, JD, target role, or accepted bullets update
+  useEffect(() => {
+    if (!state.sections || state.sections.length === 0 || state.backendHealth.status !== 'connected') {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const acceptedMap: Record<string, string> = {};
+        for (const b of state.enhancedBullets) {
+          if (b.status === 'accepted') {
+            const improvedText = (b.editedImproved ?? b.improved ?? b.original).trim();
+            const key1 = b.originalBulletId || (b as any).original_bullet_id || b.id;
+            if (key1) acceptedMap[key1] = improvedText;
+            if (b.original && b.original.trim()) {
+              acceptedMap[b.original.trim()] = improvedText;
+            }
+          }
+        }
+
+        const score = await scoreResumeAts(
+          state.sections,
+          state.preferences.jobDescription,
+          state.preferences.targetRole,
+          Object.keys(acceptedMap).length > 0 ? acceptedMap : undefined
+        );
+        if (score) {
+          dispatch({ type: 'SET_ATS_SCORE', score });
+        }
+      } catch {
+        // fail gracefully
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [state.sections, state.preferences.jobDescription, state.preferences.targetRole, state.enhancedBullets, state.backendHealth.status]);
 
   return (
     <AppStateContext.Provider value={state}>

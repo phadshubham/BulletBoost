@@ -18,7 +18,6 @@ def export_docx_endpoint(request: ExportDocxRequest):
         doc_bytes = generate_resume_docx(
             sections=request.sections,
             accepted_bullets_map=accepted_map,
-            document_title=safe_filename,
         )
 
         return Response(

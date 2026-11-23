@@ -81,6 +81,10 @@ export interface EnhancedBullet {
   missingEvidence?: string[];
   status: ReviewStatus;
   decisionReason?: DecisionReason | string | null;
+  atsDelta?: number;
+  atsBreakdown?: string[];
+  styleVariation?: 'xyz' | 'executive' | 'technical';
+  isOrphan?: boolean;
 }
 
 // ── Custom ML Classifier & Evaluation types ─────────────────────────
@@ -195,7 +199,7 @@ export interface EnhanceBulletsResponse {
 
 // ── Import types ────────────────────────────────────────────────────
 
-export type ImportMethod = 'upload' | 'paste';
+export type ImportMethod = 'upload' | 'paste' | 'library';
 
 export interface ImportedFile {
   name: string;
@@ -222,7 +226,8 @@ export type AppStep =
   | 'import'
   | 'analysis'
   | 'preferences'
-  | 'results';
+  | 'results'
+  | 'overview';
 
 export interface BackendHealthState {
   status: 'checking' | 'connected' | 'disconnected';
@@ -247,6 +252,11 @@ export interface AppState {
   isProcessing: boolean;
   error: string | null;
   backendHealth: BackendHealthState;
+  activeProjectId?: string | null;
+  atsScore?: AtsResumeScore | null;
+  projectList?: ProjectSummary[];
+  isSavingProject?: boolean;
+  lastSavedAt?: string | null;
 }
 
 // ── Export types ────────────────────────────────────────────────────
@@ -262,3 +272,91 @@ export interface ExportDocxRequest {
   accepted_bullets: AcceptedBulletExportItem[];
 }
 
+
+// ── ATS Scoring & History types ──────────────────────────────────────
+
+export interface AtsResumeScore {
+  overall_score: number;
+  keyword_score: number;
+  impact_score: number;
+  brevity_score?: number;
+  structure_score: number;
+  matched_keywords: string[];
+  missing_keywords: string[];
+  recommendations: string[];
+  total_bullets_analyzed: number;
+  buzzwords_detected?: string[];
+  repetitive_verbs?: string[];
+  xyz_compliance_rate?: number;
+}
+
+export interface AtsBulletScore {
+  original_score: number;
+  improved_score: number;
+  delta: number;
+  breakdown: string[];
+  matched_keywords: string[];
+}
+
+export interface JdGapData {
+  matched_skills: string[];
+  missing_skills: string[];
+  match_percentage: number;
+  recommendations: string[];
+}
+
+export interface BulletRevisionItem {
+  id: string;
+  bullet_id: string;
+  section_title: string;
+  original_text: string;
+  current_text: string;
+  status: string;
+  decision_reason?: string | null;
+  ats_delta?: number | null;
+  variation_angle?: string | null;
+  created_at: string;
+}
+
+export interface ProjectSummary {
+  id: string;
+  title: string;
+  target_role: string;
+  writing_style: string;
+  bullet_count: number;
+  accepted_count?: number;
+  rejected_count?: number;
+  pending_count?: number;
+  ats_score?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectDetail {
+  id: string;
+  title: string;
+  target_role: string;
+  job_description: string;
+  writing_style: string;
+  supporting_facts: string;
+  filename: string;
+  raw_text?: string;
+  sections: ResumeSection[];
+  enhanced_bullets?: EnhancedBullet[];
+  revisions: BulletRevisionItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UploadedResumeItem {
+  id: string;
+  project_id: string;
+  filename: string;
+  file_type: string;
+  bullet_count: number;
+  section_count: number;
+  sections: ResumeSection[];
+  raw_text?: string;
+  created_at: string;
+  uploaded_at?: string;
+}
